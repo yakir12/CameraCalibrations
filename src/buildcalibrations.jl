@@ -49,69 +49,102 @@ collection of the intrinsic image files.
 function buildcalibration(check, extrinsic::AbstractString, intrinsic::AbstractVector)
     mat"""
     warning('off','all')
-    [imagePoints, boardSize, imagesUsed] = detectCheckerboardPoints($intrinsic);
-    extrinsicI = imread($extrinsic);
-    $sz = size(extrinsicI);
-    worldPoints = generateCheckerboardPoints(boardSize, $check);
-    %%
-    params = estimateCameraParameters(imagePoints, worldPoints, 'ImageSize', $sz, 'EstimateSkew', true, 'NumRadialDistortionCoefficients', 3, 'EstimateTangentialDistortion', true, 'WorldUnits', 'cm');
-    n = size(imagePoints, 3);
-    errors_ = zeros(n,1);
-    for i = 1:n
-        [R,t] = extrinsics(imagePoints(:,:,i), worldPoints, params);
-        newWorldPoints = pointsToWorld(params, R, t, imagePoints(:,:,i));
-        errors_(i) = mean(vecnorm(worldPoints - newWorldPoints, 1, 2));
-    end
-    kill = errors_ > 1;
-    while any(kill)
-        imagePoints(:,:,kill) = [];    
-        params = estimateCameraParameters(imagePoints, worldPoints, 'ImageSize', $sz, 'EstimateSkew', true, 'NumRadialDistortionCoefficients', 3, 'EstimateTangentialDistortion', true, 'WorldUnits', 'cm');
-        n = size(imagePoints, 3);
-        errors_ = zeros(n,1);
+    try
+        intrinsicFileNames = $intrinsic
+        % Detect checkerboards in images
+        [imagePoints, boardSize, imagesUsed] = detectCheckerboardPoints(intrinsicFileNames);
+        intrinsicFileNames = intrinsicFileNames(imagesUsed);
+
+        % Read the first image to obtain image size
+        extrinsicImage = imread($extrinsic);
+        [mrows, ncols, ~] = size(extrinsicImage);
+        $sz = [mrows, ncols];
+
+        % Generate world coordinates of the corners of the squares
+        worldPoints = generateCheckerboardPoints(boardSize, $check);
+
+        % Calibrate the camera
+        [cameraParams, imagesUsed] = estimateCameraParameters(imagePoints, worldPoints, ...
+        'EstimateSkew', true, 'EstimateTangentialDistortion', true, ...
+        'NumRadialDistortionCoefficients', 3, 'WorldUnits', 'centimeters', ...
+        'InitialIntrinsicMatrix', [], 'InitialRadialDistortion', [], ...
+        'ImageSize', [mrows, ncols]);
+        intrinsicFileNames = intrinsicFileNames(imagesUsed);
+
+        % Find reprojection error
+        n = length(intrinsicFileNames);
+        errors2 = zeros(n, 1);
         for i = 1:n
-            [R,t] = extrinsics(imagePoints(:,:,i), worldPoints, params);
-            newWorldPoints = pointsToWorld(params, R, t, imagePoints(:,:,i));
-            errors_(i) = mean(vecnorm(worldPoints - newWorldPoints, 1, 2));
+            imOrig = imread(intrinsicFileNames{i});
+            [im, newOrigin] = undistortImage(imOrig, cameraParams);
+            [ips,boardSize] = detectCheckerboardPoints(im);
+            ips = [ips(:,1) + newOrigin(1), ips(:,2) + newOrigin(2)];
+            [R, t] = extrinsics(ips, worldPoints, cameraParams);
+            ips2 = worldToImage(cameraParams, R, t, [worldPoints, zeros(size(worldPoints,1), 1)]);
+            errors2(i) = mean(vecnorm(ips - ips2, 2, 2));
         end
-        kill = errors_ > 1;
+
+        % Delete the 10% worst cases
+        [~, i] = sort(errors2);
+        if n < 5
+            ni = 0;
+        else
+            ni = round(n*0.1);
+        end
+        intrinsicFileNames = intrinsicFileNames(i(1:n - ni));
+        $errors = errors2(i(1:n - ni));
+
+        % Detect checkerboards in images
+        imagePoints = detectCheckerboardPoints(intrinsicFileNames);
+
+        % Calibrate the camera again
+        cameraParams = estimateCameraParameters(imagePoints, worldPoints, ...
+        'EstimateSkew', true, 'EstimateTangentialDistortion', true, ...
+        'NumRadialDistortionCoefficients', 3, 'WorldUnits', 'centimeters', ...
+        'InitialIntrinsicMatrix', cameraParams.IntrinsicMatrix, 'InitialRadialDistortion', cameraParams.RadialDistortion, ...
+        'ImageSize', [mrows, ncols]);
+
+        [im, newOrigin] = undistortImage(extrinsicImage, cameraParams);
+        xy = detectCheckerboardPoints(im);
+
+        % In case the single extrinsic image is not optimal
+        i = 0;
+        while size(xy,1) ~= size(worldPoints, 1) && i < 25
+            MinCornerMetric = MinCornerMetric + 0.05;
+            i = i + 1;
+            xy = detectCheckerboardPoints(im, 'MinCornerMetric', MinCornerMetric);
+        end
+
+
+        [R,t] = extrinsics(xy,worldPoints,cameraParams);
+        $success = true;
+    catch ex
+        $success = false;
     end
-    $errors = errors_;
-    %%
-    imUndistorted = undistortImage(extrinsicI, params);
-    MinCornerMetric = 0.15;
-    xy = detectCheckerboardPoints(imUndistorted, 'MinCornerMetric', MinCornerMetric);
-    MinCornerMetric = 0.;
-    i = 0;
-    while size(xy,1) ~= size(worldPoints, 1) && i < 25
-        MinCornerMetric = MinCornerMetric + 0.05;
-        i = i + 1;
-        xy = detectCheckerboardPoints(imUndistorted, 'MinCornerMetric', MinCornerMetric);
-    end
-    $failed = size(xy,1) ~= size(worldPoints, 1)
     """
-    if failed
-        @error "extrinsic image is of too low quality, select another time-stamp with a clearer extrinsic image"
-    else
-        h, w = Int.(sz[1:2])
-        _image = [(x, y) for x in 1:w for y in 1:h]
-        image = hcat(first.(_image), last.(_image))
-        mat"""
-        [R,t] = extrinsics(xy,worldPoints,params);
-        $world = pointsToWorld(params, R, t, $image);
-        """
-        _tform = interpolate(reshape(V2.(eachrow(world)), h, w)', BSpline(Linear()))
-        tform = splat(extrapolate(scale(_tform, 1:w, 1:h), Flat()))
-        mx, Mx = extrema(world[:,1])
-        my, My = extrema(world[:,2])
-        xs = mx:Mx
-        ys = my:My
-        worldPoints = vcat(([x y 0.0] for x in xs for y in ys)...)
-        mat"""
-        $projectedPoints = worldToImage(params,R,t,$worldPoints);
-        """
-        _itform = interpolate(reshape(V2.(eachrow(projectedPoints)), length(ys), length(xs))', BSpline(Linear()))
-        itform = splat(extrapolate(scale(_itform, xs, ys), Flat()))
-        ϵ = quantile(errors, [0, 0.5, 1])
-        (; tform, itform, ϵ)
-    end
+    @assert success "extrinsic image is of too low quality, select another time-stamp with a clearer extrinsic image"
+
+    h, w = Int.(sz[1:2])
+    rows = 1:h
+    cols = 1:w
+    points = vcat(map.(hcat, rows, cols')...)
+
+    mat"""
+    $world = pointsToWorld(cameraParams, R, t, $points);
+    """
+    _tform = interpolate(reshape(V2.(eachrow(world)), h, w)', BSpline(Linear()))
+    tform = splat(extrapolate(scale(_tform, 1:w, 1:h), Flat()))
+    mx, Mx = extrema(world[:,1])
+    my, My = extrema(world[:,2])
+    xs = mx:Mx
+    ys = my:My
+    worldPoints = vcat(map.(hcat, xs, ys', 0.0)...)
+    # worldPoints = vcat(([x y 0.0] for x in xs for y in ys)...)
+    mat"""
+    $projectedPoints = worldToImage(cameraParams,R,t,$worldPoints);
+    """
+    _itform = interpolate(reshape(V2.(eachrow(projectedPoints)), length(ys), length(xs))', BSpline(Linear()))
+    itform = splat(extrapolate(scale(_itform, xs, ys), Flat()))
+    ϵ = errors
+    (; tform, itform, ϵ)
 end
