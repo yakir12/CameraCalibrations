@@ -1,5 +1,5 @@
 function [sz, cameraParams, R, t, errors] = bothcalibrations(check, extrinsic, intrinsic)
-    intrinsicFileNames = intrinsic;
+    intrinsicFileNames = [extrinsic; intrinsic];
     [imagePoints, boardSize, imagesUsed] = detectCheckerboardPoints(intrinsicFileNames);
     intrinsicFileNames = intrinsicFileNames(imagesUsed);
 
@@ -39,13 +39,16 @@ function [sz, cameraParams, R, t, errors] = bothcalibrations(check, extrinsic, i
     xy = detectCheckerboardPoints(im);
 
     i = 0;
-    MinCornerMetric = 0.05;
-    while size(xy,1) ~= size(worldPoints, 1) && i < 25
+    MinCornerMetric = 0.15;
+    max_iter = 25
+    while size(xy,1) ~= size(worldPoints, 1) && i < max_iter
         MinCornerMetric = MinCornerMetric + 0.05;
         i = i + 1;
         xy = detectCheckerboardPoints(im, 'MinCornerMetric', MinCornerMetric);
     end
-    disp('kaka')
+    if i == max_iter
+        xy = imagePoints(:,:,1);
+    end
     [R,t] = extrinsics(xy,worldPoints,cameraParams);
 
     sz = [mrows, ncols];
