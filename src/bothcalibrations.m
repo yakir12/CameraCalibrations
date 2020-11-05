@@ -39,13 +39,13 @@ function [sz, cameraParams, R, t, errors] = bothcalibrations(check, extrinsic, i
     xy = detectCheckerboardPoints(im);
 
     i = 0;
-    MinCornerMetric = 0.15;
+    MinCornerMetric = 0.05;
     while size(xy,1) ~= size(worldPoints, 1) && i < 25
         MinCornerMetric = MinCornerMetric + 0.05;
         i = i + 1;
         xy = detectCheckerboardPoints(im, 'MinCornerMetric', MinCornerMetric);
     end
-
+    disp('kaka')
     [R,t] = extrinsics(xy,worldPoints,cameraParams);
 
     sz = [mrows, ncols];
