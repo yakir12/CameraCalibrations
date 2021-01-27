@@ -40,7 +40,7 @@ function [sz, cameraParams, R, t, errors] = bothcalibrations(check, extrinsic, i
 
     i = 0;
     MinCornerMetric = 0.15;
-    max_iter = 25
+    max_iter = 25;
     while size(xy,1) ~= size(worldPoints, 1) && i < max_iter
         MinCornerMetric = MinCornerMetric + 0.05;
         i = i + 1;
