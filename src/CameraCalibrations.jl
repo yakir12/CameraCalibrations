@@ -4,7 +4,7 @@ using Statistics, LinearAlgebra
 using PythonCall, FileIO, StaticArrays, CoordinateTransformations, Rotations, Polynomials
 using ImageTransformations, Colors, ImageDraw
 
-export Calibration, RowCol, XYZ, calculate_errors, rectify, plot
+export Calibration, RowCol, XYZ, calculate_errors, rectification, plot
 
 # using CondaPkg
 # CondaPkg.add.(["numpy", "opencv"])
