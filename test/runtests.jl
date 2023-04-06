@@ -8,7 +8,7 @@ checker_size = 1
 c = Calibration(files, n_corners, checker_size)
 
 @testset "Accuracy" begin
-    ϵ = calculate_errors(c)
+    n, ϵ... = calculate_errors(c)
     @test all(<(1), ϵ)
 end
 

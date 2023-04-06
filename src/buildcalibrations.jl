@@ -1,56 +1,20 @@
-function calibrateCamera(_files, n_corners)
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    objp = np.zeros((1, *(n_corners...), 3), np.float32)
-    for i in 1:n_corners[1], j in 1:n_corners[2]
-        row = LinearIndices(n_corners)[i, j]
-        objp[0][row - 1][1] = i - 1
-        objp[0][row - 1][0] = j - 1
-    end
-
-    py_imgpoints = PyList([])
-    py_objpoints = PyList([])
-    files = String[]
-    for file in _files
-        img = cv2.imread(file)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        ret, corners = cv2.findChessboardCorners(gray, n_corners, cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
-        if Bool(ret)
-            corners2 = cv2.cornerSubPix(gray, corners, (11,11),(-1,-1), criteria)
-            corners3 = np.flip(corners2, axis = 2)
-            push!(py_imgpoints, corners3)
-            push!(py_objpoints, objp)
-            push!(files, file)
-        end
-    end
-
-    img = cv2.imread(files[1])
-    sz = (pyconvert(Int, np.size(img, 0)), pyconvert(Int, np.size(img, 1)))
-
-    py_deviation, py_mtx, py_dist, py_rvecs, py_tvecs = cv2.calibrateCamera(py_objpoints, py_imgpoints, np.flip(sz), nothing, nothing, flags = cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_K2 + cv2.CALIB_FIX_K3)
-
-    k, _ = PyArray(py_dist)
-    Rs = vec.(Matrix.(PyArray.(py_rvecs)))
-    ts = vec.(Matrix.(PyArray.(py_tvecs)))
-    mtx = Matrix(PyArray(py_mtx))
-
-    frow = mtx[1,1]
-    fcol = mtx[2,2]
-    crow = mtx[1,3]
-    ccol = mtx[2,3]
-
-    objpoints = reshape(XYZ.(eachslice(PyArray(py_objpoints[1]); dims=2)), n_corners)
-    imgpointss = [reshape(RowCol.(eachslice(PyArray(py_imgpoint); dims = 1)), n_corners) for py_imgpoint in py_imgpoints]
-
-    return (; files, k, Rs, ts, frow, fcol, crow, ccol, objpoints, imgpointss, sz)
-end
-
+"""
+    lens_distortion
+Lens distortion for one radial coefficient.
+"""
 function lens_distortion(v, k)
+    k == 0 && return v
     r² = LinearAlgebra.norm_sqr(v)
     radial = 1 + k*r²
     radial*v
 end
 
+"""
+    inv_lens_distortion
+Analytical inverse lens distortion for one radial coefficient.
+"""
 function inv_lens_distortion(v2, k)
+    k == 0 && return v2
     c = k*LinearAlgebra.norm_sqr(v2)
     rs = roots(Polynomial([c, 0, 1, -1]))
     rrs = filter(x -> abs(imag(x)) < 1e-10  , rs)
@@ -58,58 +22,60 @@ function inv_lens_distortion(v2, k)
     v2 / radial
 end
 
-function obj2img(frow, fcol, crow, ccol, k, Rs, ts, checker_size)
+function obj2img(k, Rs, ts, frow, fcol, crow, ccol, checker_size)
     intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
     distort(rc) = lens_distortion(rc, k)
-    # extrinsics = Dict(file => AffineMap(RotationVec(Rs[file]...), ts[file]) for file in keys(Rs))
     extrinsics = AffineMap.(Base.splat(RotationVec).(Rs), ts)
     scale = LinearMap(SDiagonal{3}(I/checker_size))
     return intrinsic, distort, extrinsics, scale
 end
 
+# this is the inverse prespective map
 depth(rc1, t, l) = -t/(l⋅rc1)
-function get_prespective_map(inv_extrinsic)
+function get_inv_prespective_map(inv_extrinsic)
     function (rc)
         rc1 = push(rc, 1)
-        d = depth(rc1, inv_extrinsic.translation[3], inv_extrinsic.linear[end, :])
+        t = inv_extrinsic.translation[3]
+        l = inv_extrinsic.linear[end, :]
+        d = depth(rc1, t, l)
         return d .* rc1
     end
 end
 
-function img2obj(scale, extrinsics, intrinsic, k)
+function img2obj(intrinsic, extrinsics, scale, k)
     inv_extrinsics = inv.(extrinsics)
-    # inv_extrinsics = Dict(file => inv(extrinsic) for (file, extrinsic) in extrinsics)
-    inv_perspective_maps = get_prespective_map.(inv_extrinsics)
-    # inv_perspective_maps = Dict(file => get_prespective_map(inv_extrinsic) for (file, inv_extrinsic) in inv_extrinsics)
-    inv_intrinsic = inv(intrinsic)
+    inv_perspective_maps = get_inv_prespective_map.(inv_extrinsics)
     inv_distort(rc) = inv_lens_distortion(rc, k)
-    return inv(scale), inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic
+    return inv(scale), inv_extrinsics, inv_perspective_maps, inv_distort, inv(intrinsic)
 end
 
 struct Calibration
-    files
-    n_corners
-    checker_size
-    objpoints
-    imgpointss
-    real2image
-    image2real
-    sz
+    files # image files
+    n_files # how many
+    n_corners # the number of corners in each of the two dimensions of the checkerboard
+    checker_size # physical size of the checker (e.g. in cm)
+    objpoints # ideal real world coordinates of the checkerboard corners
+    imgpointss # the detetcted corners in each of the images, in pixel coordinates
+    k # radial lens distortion coefficient
+    real2image # the transformation that converts real world to image coordinates
+    image2real # the transformation that converts image coordinates to real world
+    sz # the dimensions of the images
 end
 
 """
     Calibration(files, n_corners, checker_size, extrinsic_index)
-Build a calibration object. `files` are the image files of the checkerboard. `n_corners` is a tuple of the number of corners in each of the sides of the checkerboard. `checker_size` is the physical size of the checker (e.g. in cm). 
+Build a calibration object. `files` are the image files of the checkerboard. `n_corners` is a tuple of the number of corners in each of the sides of the checkerboard. `checker_size` is the physical size of the checker (e.g. in cm). `with_distortion` controls if radial lens distortion is included in the model or not.
 """
-function Calibration(files, n_corners, checker_size)
-    files, k, Rs, ts, frow, fcol, crow, ccol, objpoints, imgpointss, sz = calibrateCamera(unique(files), n_corners)
+function Calibration(files, n_corners, checker_size; with_distortion = true)
+    files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol = detect_fit(unique(files), n_corners, with_distortion)
     objpoints .*= checker_size
-    intrinsic, distort, extrinsics, scale = obj2img(frow, fcol, crow, ccol, k, Rs, ts, checker_size)
+    intrinsic, distort, extrinsics, scale = obj2img(k, Rs, ts, frow, fcol, crow, ccol, checker_size)
     real2image = .∘(Ref(intrinsic), distort, Ref(PerspectiveMap()), extrinsics, Ref(scale))
-    inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(scale, extrinsics, intrinsic, k)
+    inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(intrinsic, extrinsics, scale, k)
     image2real = .∘(Ref(inv_scale), inv_extrinsics, inv_perspective_maps, inv_distort, Ref(inv_intrinsic))
-    Calibration(files, n_corners, checker_size, objpoints, imgpointss, real2image, image2real, sz)
+    Calibration(files, length(files), n_corners, checker_size, objpoints, imgpointss, k, real2image, image2real, sz)
 end
+
 
 """
     c(i::RowCol, extrinsic)
@@ -134,18 +100,23 @@ Return a function that accepts an instance of `::RowCol` and converts it to its 
 """
 rectification(c, extrinsic_index) = pop ∘ c.image2real[extrinsic_index]
 
+function _reprojection(c, i)
+    imgpoints = c.imgpointss[i]
+    reprojected = c.(c.objpoints, i)
+    sum(LinearAlgebra.norm_sqr, reprojected .- imgpoints)
+end
+
 """
     calculate_errors(c)
 Calculate reprojection, projection, distance, and inverse errors for the calibration `c`. `distance` measures the mean error of the distance between all adjacent checkerboard corners from the expected `checker_size`. `inverse` measures the mean error of applying the calibration's transformation and its inverse `inverse_samples` times.
 """
-function calculate_errors(c, inverse_samples=1000)
+function calculate_errors(c, inverse_samples=100)
     reprojection = 0.0
     projection = 0.0
     distance = 0.0
     inverse = 0.0
     for (i, imgpoints) in pairs(c.imgpointss)
-        reprojected = c.(c.objpoints, i)
-        reprojection += sum(LinearAlgebra.norm_sqr, reprojected .- imgpoints)
+        reprojection += _reprojection(c, i)
 
         projected = c.(imgpoints, i)
         projection += sum(LinearAlgebra.norm_sqr, projected .- c.objpoints)
@@ -161,12 +132,22 @@ function calculate_errors(c, inverse_samples=1000)
             LinearAlgebra.norm_sqr(rc .- reprojected)
         end
     end
-    nfiles = length(c.files)
-    n = prod(c.n_corners)*nfiles
+    n = prod(c.n_corners)*c.n_files
     reprojection = sqrt(reprojection/n)
     projection = sqrt(projection/n)
-    distance = sqrt(distance/prod(c.n_corners .- 1)/nfiles)
-    inverse = sqrt(inverse/inverse_samples/nfiles)
-    return (; reprojection, projection, distance, inverse)
+    distance = sqrt(distance/prod(c.n_corners .- 1)/c.n_files)
+    inverse = sqrt(inverse/inverse_samples/c.n_files)
+    return (; n = c.n_files, reprojection, projection, distance, inverse)
 end
 
+"""
+    improve
+Identify all the images that had relatively high reprojection errors, and rerun the calibration without them. Include a maximum of `n` images with the lowest reprojection error, or all the images with an error lower than `threshold`.
+"""
+function improve(c, n=15, threshold=2)
+    c.n_files ≤ n && return c
+    reprojection = sqrt.(_reprojection.(Ref(c), 1:c.n_files) ./ prod(c.n_corners))
+    cutoff = max(threshold, sort(reprojection)[n])
+    files = [file for (file, ϵ) in zip(c.files, reprojection) if ϵ ≤ cutoff]
+    Calibration(files, c.n_corners, c.checker_size; with_distortion=c.k ≠ 0)
+end
