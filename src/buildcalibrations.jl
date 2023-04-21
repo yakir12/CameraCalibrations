@@ -36,7 +36,6 @@ end
 # end
 
 function obj2img(k, Rs, ts, checker_size)
-    intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
     distort(rc) = lens_distortion(rc, k)
     extrinsics = AffineMap.(Base.splat(RotationVec).(Rs), ts)
     scale = LinearMap(SDiagonal{3}(I/checker_size))
@@ -55,10 +54,11 @@ function get_inv_prespective_map(inv_extrinsic)
     end
 end
 
-function img2obj(inv_intrinsic, extrinsics, scale, k)
+function img2obj(extrinsics, scale, k)
+    inv_extrinsics = inv.(extrinsics)
     inv_perspective_maps = get_inv_prespective_map.(inv_extrinsics)
     inv_distort(rc) = inv_lens_distortion(rc, k)
-    return inv(scale), inv_perspective_maps, inv_distort, inv(intrinsic)
+    return inv(scale), inv_extrinsics, inv_perspective_maps, inv_distort
 end
 
 struct Calibration
@@ -74,22 +74,13 @@ struct Calibration
     sz # the dimensions of the images
 end
 
-function find_bad_images(inv_intrinsic, files, imgpointss, k)
-    bad = empty(files)
-    k ≥ 0 && return bad
-    for (file, imgpoints) in zip(files, imgpointss)
-        if any(>(4/27/k) ∘ LinearAlgebra.norm_sqr ∘ inv_intrinsic, points)
-            push!(bad, file)
-        end
-    end
-    return bad
-end
+find_bad_images(inv_intrinsic, files, imgpointss, k) = [file for (file, imgpoints) in zip(files, imgpointss) if any(>(4/27/k) ∘ LinearAlgebra.norm_sqr ∘ inv_intrinsic, imgpoints)]
 
-invalid_distortion_coordinate(rc::RowCol, k, c) = k ≥ 0 || LinearAlgebra.norm_sqr(c.inv_intrinsic(rc)) > -4/27/k
-function invalid_distortion_coordinate(xyz::XYZ, k, c) 
-    #TODO:  maybe ditch the z dimension and keep the image plane as the extrinsic_index...? fix the get_axes function
-    to_r = PerspectiveMap() ∘ c.extrinsics[extrinsic_index] ∘ scale  ∘ Base.Fix2(push, 0)
-    k ≥ 0 || LinearAlgebra.norm_sqr(inv_intrinsic(rc)) > -4/27/k
+# invalid_distortion_coordinate(rc::RowCol, k, c) = k ≥ 0 || LinearAlgebra.norm_sqr(c.inv_intrinsic(rc)) > -4/27/k
+# function invalid_distortion_coordinate(xyz::XYZ, k, c) 
+#     #TODO:  maybe ditch the z dimension and keep the image plane as the extrinsic_index...? fix the get_axes function
+#     to_r = PerspectiveMap() ∘ c.extrinsics[extrinsic_index] ∘ scale  ∘ Base.Fix2(push, 0)
+#     k ≥ 0 || LinearAlgebra.norm_sqr(inv_intrinsic(rc)) > -4/27/k
 
 """
     Calibration(files, n_corners, checker_size, extrinsic_index)
@@ -99,20 +90,22 @@ function Calibration(files, n_corners, checker_size; with_distortion = true)
     files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol = detect_fit(unique(files), n_corners, with_distortion)
     intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
     inv_intrinsic = inv(intrinsic)
-    bad = find_bad_images(inv_intrinsic, files, imgpointss, k)
-    while !isempty(bad)
-        @info "some images had checkerboard corners outside the distortion model, removing bad images and rerunning calibration"
-        deleteat!(files, bad)
-        files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol = detect_fit(files, n_corners, with_distortion)
-        intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
-        inv_intrinsic = inv(intrinsic)
-        bad = find_bad_images(inv_intrinsic, files, imgpointss, k)
-    end
-    
+    # if  k < 0
+    #     bad = find_bad_images(inv_intrinsic, files, imgpointss, k)
+    #     while !isempty(bad)
+    #         @info "some images had checkerboard corners outside the distortion model, removing bad images and rerunning calibration"
+    #         filter!(∉(bad), files)
+    #         @assert length(files) > 0 "all images had corners outside the distortion model"
+    #         files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol = detect_fit(files, n_corners, with_distortion)
+    #         intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
+    #         inv_intrinsic = inv(intrinsic)
+    #         bad = find_bad_images(inv_intrinsic, files, imgpointss, k)
+    #     end
+    # end
     objpoints .*= checker_size
     distort, extrinsics, scale = obj2img(k, Rs, ts, checker_size)
     real2image = .∘(Ref(intrinsic), distort, Ref(PerspectiveMap()), extrinsics, Ref(scale))
-    inv_scale, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(inv_intrinsic, extrinsics, scale, k)
+    inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort = img2obj(extrinsics, scale, k)
     image2real = .∘(Ref(inv_scale), inv_extrinsics, inv_perspective_maps, inv_distort, Ref(inv_intrinsic))
 
     Calibration(files, length(files), n_corners, checker_size, objpoints, imgpointss, k, real2image, image2real, sz)

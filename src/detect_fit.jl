@@ -69,7 +69,7 @@ end
 
 function detect_fit(_files, n_corners, with_distortion)
     files, imgpointss = detect_corners(_files, n_corners)
-
+    @assert length(files) > 0 "No corners were detected in any of the files"
     objpoints = get_object_points(n_corners)
     sz = size(load(files[1]))
 
