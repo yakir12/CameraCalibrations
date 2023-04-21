@@ -5,6 +5,9 @@ Lens distortion for one radial coefficient.
 function lens_distortion(v, k)
     k == 0 && return v
     r² = LinearAlgebra.norm_sqr(v)
+    if k < 0 && r² > -1/3/k
+        throw(ArgumentError("real-world coordinates outside lens distortion model (the radial distortion of the lens is too strong)"))
+    end
     radial = 1 + k*r²
     radial*v
 end
@@ -13,21 +16,31 @@ end
     inv_lens_distortion
 Analytical inverse lens distortion for one radial coefficient.
 """
-function inv_lens_distortion(v2, k)
-    k == 0 && return v2
-    c = k*LinearAlgebra.norm_sqr(v2)
-    rs = roots(Polynomial([c, 0, 1, -1]))
-    rrs = filter(x -> abs(imag(x)) < 1e-10  , rs)
-    radial = maximum(real, rrs)
+function inv_lens_distortion(v2, k) 
+    r² = LinearAlgebra.norm_sqr(v2)
+    if k < 0 && r² > -4/27/k
+        throw(ArgumentError("image coordinates outside lens inverse-distortion model (the radial distortion of the lens is too strong)"))
+    end
+    c = k*r² + 0im
+    term = 1 - sign(k)*sqrt(3)*1im
+    radial = real((term*(2^(2/3)*term*(-27*c + sqrt((27*c + 2)^2 - 4) - 2)^(1/3) + 4)*(-27*c + sqrt((27*c + 2)^2 - 4) - 2)^(1/3) + 8*2^(1/3))/(12*term*(-27*c + sqrt((27*c + 2)^2 - 4) - 2)^(1/3)))
     v2 / radial
 end
+# function inv_lens_distortion(v2, k)
+#     k == 0 && return v2
+#     c = k*LinearAlgebra.norm_sqr(v2)
+#     rs = roots(Polynomial([c, 0, 1, -1]))
+#     rrs = filter(x -> abs(imag(x)) < 1e-10  , rs)
+#     radial = maximum(real, rrs)
+#     v2 / radial
+# end
 
-function obj2img(k, Rs, ts, frow, fcol, crow, ccol, checker_size)
+function obj2img(k, Rs, ts, checker_size)
     intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
     distort(rc) = lens_distortion(rc, k)
     extrinsics = AffineMap.(Base.splat(RotationVec).(Rs), ts)
     scale = LinearMap(SDiagonal{3}(I/checker_size))
-    return intrinsic, distort, extrinsics, scale
+    return distort, extrinsics, scale
 end
 
 # this is the inverse prespective map
@@ -42,11 +55,10 @@ function get_inv_prespective_map(inv_extrinsic)
     end
 end
 
-function img2obj(intrinsic, extrinsics, scale, k)
-    inv_extrinsics = inv.(extrinsics)
+function img2obj(inv_intrinsic, extrinsics, scale, k)
     inv_perspective_maps = get_inv_prespective_map.(inv_extrinsics)
     inv_distort(rc) = inv_lens_distortion(rc, k)
-    return inv(scale), inv_extrinsics, inv_perspective_maps, inv_distort, inv(intrinsic)
+    return inv(scale), inv_perspective_maps, inv_distort, inv(intrinsic)
 end
 
 struct Calibration
@@ -62,17 +74,47 @@ struct Calibration
     sz # the dimensions of the images
 end
 
+function find_bad_images(inv_intrinsic, files, imgpointss, k)
+    bad = empty(files)
+    k ≥ 0 && return bad
+    for (file, imgpoints) in zip(files, imgpointss)
+        if any(>(4/27/k) ∘ LinearAlgebra.norm_sqr ∘ inv_intrinsic, points)
+            push!(bad, file)
+        end
+    end
+    return bad
+end
+
+invalid_distortion_coordinate(rc::RowCol, k, c) = k ≥ 0 || LinearAlgebra.norm_sqr(c.inv_intrinsic(rc)) > -4/27/k
+function invalid_distortion_coordinate(xyz::XYZ, k, c) 
+    #TODO:  maybe ditch the z dimension and keep the image plane as the extrinsic_index...? fix the get_axes function
+    to_r = PerspectiveMap() ∘ c.extrinsics[extrinsic_index] ∘ scale  ∘ Base.Fix2(push, 0)
+    k ≥ 0 || LinearAlgebra.norm_sqr(inv_intrinsic(rc)) > -4/27/k
+
 """
     Calibration(files, n_corners, checker_size, extrinsic_index)
 Build a calibration object. `files` are the image files of the checkerboard. `n_corners` is a tuple of the number of corners in each of the sides of the checkerboard. `checker_size` is the physical size of the checker (e.g. in cm). `with_distortion` controls if radial lens distortion is included in the model or not.
 """
 function Calibration(files, n_corners, checker_size; with_distortion = true)
     files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol = detect_fit(unique(files), n_corners, with_distortion)
+    intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
+    inv_intrinsic = inv(intrinsic)
+    bad = find_bad_images(inv_intrinsic, files, imgpointss, k)
+    while !isempty(bad)
+        @info "some images had checkerboard corners outside the distortion model, removing bad images and rerunning calibration"
+        deleteat!(files, bad)
+        files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol = detect_fit(files, n_corners, with_distortion)
+        intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
+        inv_intrinsic = inv(intrinsic)
+        bad = find_bad_images(inv_intrinsic, files, imgpointss, k)
+    end
+    
     objpoints .*= checker_size
-    intrinsic, distort, extrinsics, scale = obj2img(k, Rs, ts, frow, fcol, crow, ccol, checker_size)
+    distort, extrinsics, scale = obj2img(k, Rs, ts, checker_size)
     real2image = .∘(Ref(intrinsic), distort, Ref(PerspectiveMap()), extrinsics, Ref(scale))
-    inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(intrinsic, extrinsics, scale, k)
+    inv_scale, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(inv_intrinsic, extrinsics, scale, k)
     image2real = .∘(Ref(inv_scale), inv_extrinsics, inv_perspective_maps, inv_distort, Ref(inv_intrinsic))
+
     Calibration(files, length(files), n_corners, checker_size, objpoints, imgpointss, k, real2image, image2real, sz)
 end
 
@@ -114,7 +156,6 @@ function calculate_errors(c, inverse_samples=100)
     reprojection = 0.0
     projection = 0.0
     distance = 0.0
-    inverse = 0.0
     for (i, imgpoints) in pairs(c.imgpointss)
         reprojection += _reprojection(c, i)
 
@@ -125,19 +166,12 @@ function calculate_errors(c, inverse_samples=100)
             sum(abs2, norm.(diff(projected; dims)) .- c.checker_size)
         end
 
-        inverse += sum(1:inverse_samples) do _
-            rc = rand(RowCol{Float64}) .* (c.sz .- 1) .+ 1
-            projected = c(rc, i)
-            reprojected = c(projected, i)
-            LinearAlgebra.norm_sqr(rc .- reprojected)
-        end
     end
     n = prod(c.n_corners)*c.n_files
     reprojection = sqrt(reprojection/n)
     projection = sqrt(projection/n)
     distance = sqrt(distance/prod(c.n_corners .- 1)/c.n_files)
-    inverse = sqrt(inverse/inverse_samples/c.n_files)
-    return (; n = c.n_files, reprojection, projection, distance, inverse)
+    return (; n = c.n_files, reprojection, projection, distance)
 end
 
 """
