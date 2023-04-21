@@ -88,6 +88,7 @@ Build a calibration object. `files` are the image files of the checkerboard. `n_
 """
 function Calibration(files, n_corners, checker_size; with_distortion = true)
     files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol = detect_fit(unique(files), n_corners, with_distortion)
+    @show k, Rs, ts, frow, fcol, crow, ccol
     intrinsic = AffineMap(SDiagonal(frow, fcol), SVector(crow, ccol))
     inv_intrinsic = inv(intrinsic)
     # if  k < 0
