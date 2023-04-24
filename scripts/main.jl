@@ -1,10 +1,10 @@
 using Revise, CameraCalibrations
 
-n_corners = (6, 8)
-dir = "straight"
-# n_corners = (6, 9)
+# n_corners = (6, 8)
+# dir = "straight"
+n_corners = (5, 8)
 # dir = "negative"
-# dir = "../CameraCalibrations/test/example"
+dir = "../CameraCalibrations/test/example"
 files = readdir(dir; join=true)
 checker_size = 1
 c = Calibration(files, n_corners, checker_size)
