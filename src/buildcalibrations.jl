@@ -1,12 +1,14 @@
+radial(r², k₁, k₂, k₃) = 1 + k₁*r² + k₂*r²^2 + k₃*r²^3
+tangential(r², v, p₁, p₂) = SV(2p₁*prod(v) + p₂*(r² + 2v.x^2), 2p₂*prod(v) + p₁*(r² + 2v.y^2))
 """
     lens_distortion
 Lens distortion for one radial coefficient.
 """
 function lens_distortion(v, k₁, k₂, k₃, p₁, p₂)
     r² = LinearAlgebra.norm_sqr(v)
-    radial = 1 + k₁*r² + k₂*r²^2 + k₃*r²^3
-    tangential = SV(2p₁*prod(v) + p₂*(r² + 2v.x^2), 2p₂*prod(v) + p₁*(r² + 2v.y^2))
-    tangential + radial*v
+    rad = radial(r², k₁, k₂, k₃)
+    tang = tangential(r², v, p₁, p₂)
+    tang + rad*v
 end
 
 intrinsic(cam::Camera) = AffineMap(SDiagonal(cam.focal_length...), cam.principal_point)
@@ -30,12 +32,12 @@ function inv_lens_distortion(v, k₁, k₂, k₃, p₁, p₂)
     v0 = copy(v)
     for j = 1:20
         r² = LinearAlgebra.norm_sqr(v)
-        radial = 1 + k₁*r² + k₂*r²^2 + k₃*r²^3
-        if radial < 0
+        rad = radial(r², k₁, k₂, k₃)
+        if rad < 0
             break
         end
-        tangential = SV(2p₁*prod(v) + p₂*(r² + 2v.x^2), 2p₂*prod(v) + p₁*(r² + 2v.y^2))
-        v = (v0 - tangential)/radial
+        tang = tangential(r², v, p₁, p₂)
+        v = (v0 - tang)/rad
     end
     return v
 end
