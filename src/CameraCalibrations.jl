@@ -1,61 +1,68 @@
 module CameraCalibrations
 
 using Statistics, LinearAlgebra
-using PythonCall, FileIO, StaticArrays, CoordinateTransformations, Rotations, Polynomials, Colors
+using PythonCall, FileIO, StaticArrays, CoordinateTransformations, Rotations, Polynomials, Colors, ImageCore
 using ImageTransformations, ImageDraw
 
-export CalibrationData, Calibration, RowCol, XY, calculate_errors, rectification, plot, improve
+using Optim
+
+export Calibration, Camera, SV
+export image2real, real2image, gof, remove_errored!, plot
+export zero_k₁, zero_k₂, zero_k₃, zero_tangential
+
+#TODO: 
+# - generate known set of images for tests
+# - Can I really not thread/parallel the corner detection?
+# - code coverage
+# - documentation
+# - invalid images where the corners are outside the distortion model
+# - discourse post
 
 # using CondaPkg
 # CondaPkg.add.(["numpy", "opencv"])
 
+"""
+zero_tangential # Tangential distortion coefficients (p1,p2) are set to zeros and stay zero.
+zero_k₁, zero_k₂, zero_k₃ # The corresponding radial distortion coefficient is set to zero.
+"""
+@enum LensDistortion zero_k₁ zero_k₂ zero_k₃ zero_tangential
+
 const cv2 = PythonCall.pynew()
 const np = PythonCall.pynew()
+const lens_distortions = Dict{LensDistortion, Any}()
 
 function __init__()
     PythonCall.pycopy!(cv2, pyimport("cv2"))
     PythonCall.pycopy!(np, pyimport("numpy"))
+    lens_distortions[zero_k₁] = cv2.CALIB_FIX_K1
+    lens_distortions[zero_k₂] = cv2.CALIB_FIX_K2
+    lens_distortions[zero_k₃] = cv2.CALIB_FIX_K3
+    lens_distortions[zero_tangential] = cv2.CALIB_ZERO_TANGENT_DIST
 end
 
-struct RowCol{T} <: FieldVector{2, T}
-    row::T
-    col::T
-end
-StaticArrays.similar_type(::Type{<:RowCol}, ::Type{T}, s::Size{(2,)}) where {T} = RowCol{T}
 
-struct XY{T} <: FieldVector{2, T}
-    x::T
-    y::T
-end
-StaticArrays.similar_type(::Type{<:XY}, ::Type{T}, s::Size{(2,)}) where {T} = XY{T}
+const SV = SVector{2, Float64}
 
-struct CalibrationData
+mutable struct Calibration
     files::Vector
     n_corners::Tuple{Int, Int}
     checker_size::Float64
-    images_points::Vector{Matrix{RowCol}}
-    object_points::Matrix{XY}
+    images_points::Vector{Matrix{SV}}
+    object_points::Matrix{SV}
     image_size::Tuple{Int, Int}
-    with_distortion::Bool
+    distortion::Vector{LensDistortion}
 end
 
-struct Calibration
-    checker_size::Float64
-    k::Float64
+struct Camera
+    pixel_size::Float64
+    distortion::NamedTuple
     rotation_vecs::Vector{SVector{3, Float64}}
     translation_vecs::Vector{SVector{3, Float64}}
-    frow::Float64
-    fcol::Float64
-    crow::Float64
-    ccol::Float64
+    focal_length::Tuple{Float64, Float64}
+    principal_point::SV
 end
 
 push0(x) = push(x, 0)
-
-"""
-    RowCol(row, col)
-An alias for a static vector of two, row and column, indicating a cartesian coordinate in an image/matrix.
-"""
 
 """
     XYZ(x, y, z)
