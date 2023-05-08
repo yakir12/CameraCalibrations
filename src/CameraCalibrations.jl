@@ -1,10 +1,7 @@
 module CameraCalibrations
 
-using Statistics, LinearAlgebra
-using PythonCall, FileIO, StaticArrays, CoordinateTransformations, Rotations, Polynomials, Colors, ImageCore
-using ImageTransformations, ImageDraw
-
-using Optim
+using Colors, CoordinateTransformations, FileIO, ImageCore, ImageDraw, ImageTransformations, PythonCall, Rotations, StaticArrays
+using LinearAlgebra, Statistics
 
 export Calibration, Camera, SV
 export image2real, real2image, gof, remove_errored!, plot
@@ -14,7 +11,6 @@ export zero_k₁, zero_k₂, zero_k₃, zero_tangential
 # - generate known set of images for tests
 # - Can I really not thread/parallel the corner detection?
 # - code coverage
-# - documentation
 # - invalid images where the corners are outside the distortion model
 # - discourse post
 
@@ -22,7 +18,8 @@ export zero_k₁, zero_k₂, zero_k₃, zero_tangential
 # CondaPkg.add.(["numpy", "opencv"])
 
 """
-zero_tangential # Tangential distortion coefficients (p1,p2) are set to zeros and stay zero.
+Lens distortion is controlled with these enums
+zero_tangential # Tangential distortion coefficients (p₁, p₂) are set to zeros and stay zero.
 zero_k₁, zero_k₂, zero_k₃ # The corresponding radial distortion coefficient is set to zero.
 """
 @enum LensDistortion zero_k₁ zero_k₂ zero_k₃ zero_tangential
@@ -63,11 +60,6 @@ struct Camera
 end
 
 push0(x) = push(x, 0)
-
-"""
-    XYZ(x, y, z)
-An alias for a static vector of three, x, y, and z, indicating a real-world coordinate. Note that `x` is equivalent to the `column` in `RowCol` and the `y` is equivalent to the `row`.
-"""
 
 include("detect_fit.jl")
 include("buildcalibrations.jl")
