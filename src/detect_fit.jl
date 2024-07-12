@@ -54,9 +54,9 @@ function fit_model(sz, objpoints, imgpointss, n_corners,  with_distortion)
     k, _ = PyArray(py_dist)
     @assert with_distortion || k == 0 "distortion was $with_distortion but k isn't zero:" k
 
-    Rs = vec.(Matrix.(PyArray.(py_rvecs)))
+    Rs = [vec(pyconvert(Matrix{Float64}, x)) for x in py_rvecs]
 
-    ts = vec.(Matrix.(PyArray.(py_tvecs)))
+    ts = [vec(pyconvert(Matrix{Float64}, x)) for x in py_tvecs]
 
     mtx = Matrix(PyArray(py_mtx))
     frow = mtx[1,1]
