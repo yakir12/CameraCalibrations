@@ -2,13 +2,13 @@ using CameraCalibrations
 using Test
 
 n_corners = (5, 8)
-dir = "example"
+dir = joinpath(@__DIR__(), "example")
 files = readdir(dir; join=true)
 checker_size = 1
-c = Calibration(files, n_corners, checker_size)
+c, (_, ϵ...) = fit(files, n_corners, checker_size)
 
+@show ϵ
 @testset "Accuracy" begin
-    n, ϵ... = calculate_errors(c)
     @test all(<(1), ϵ)
 end
 
