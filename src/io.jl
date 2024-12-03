@@ -47,7 +47,7 @@ function load(file)
     cio = deser_json(CalibrationIO, read(file, String))
     distort(rc) = lens_distortion(rc, cio.k)
     real2image = .∘(Ref(cio.intrinsic), distort, Ref(PerspectiveMap()), cio.extrinsics, Ref(cio.scale))
-    inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic = CameraCalibrationMeta.img2obj(cio.intrinsic, cio.extrinsics, cio.scale, cio.k)
+    inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(cio.intrinsic, cio.extrinsics, cio.scale, cio.k)
     image2real = .∘(Ref(inv_scale), inv_extrinsics, inv_perspective_maps, inv_distort, Ref(inv_intrinsic))
     return Calibration(cio.intrinsic, cio.extrinsics, cio.scale, cio.k, cio.files, real2image, image2real)
 end
