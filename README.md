@@ -25,10 +25,10 @@ i2 ≈ i1 # true
 ```
 
 ## Features
-[x] saving and loading (JSON) calibration files
-[x] corner detection is done with opencv
-[x] model fitting is done with opencv
-[x] opencv is python-free
-[ ] plot calibrated images
-[ ] in-memory images
-[ ] images from video IO
+- [x] saving and loading (JSON) calibration files
+- [x] corner detection is done with opencv
+- [x] model fitting is done with opencv
+- [x] opencv is python-free
+- [ ] plot calibrated images
+- [ ] in-memory images
+- [ ] images from video IO
