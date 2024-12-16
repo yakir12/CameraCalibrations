@@ -7,7 +7,6 @@ files = readdir(dir; join=true)
 checker_size = 1
 c, (_, ϵ...) = fit(files, n_corners, checker_size)
 
-@show ϵ
 @testset "Accuracy" begin
     @test all(<(1), ϵ)
 end

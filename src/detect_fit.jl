@@ -7,8 +7,9 @@ function _detect_corners(file, n_corners, sz)
     gry = reshape(rawview(channelview(Gray.(img))), 1, sz...)
     cv_n_corners = OpenCV.Size{Int32}(n_corners...)
     _cv_corners = OpenCV.Mat(Array{Float32}(undef, 2, 1, prod(n_corners)))
-    ret, cv_corners = OpenCV.findChessboardCornersSB(gry, cv_n_corners, _cv_corners, 
-                                                     OpenCV.CALIB_CB_NORMALIZE_IMAGE + # Normalize the image gamma with equalizeHist before detection.
+    ret, cv_corners = OpenCV.findChessboardCorners(gry, cv_n_corners, _cv_corners, 
+                                                     OpenCV.CALIB_CB_ADAPTIVE_THRESH +
+                                                     OpenCV.CALIB_CB_FAST_CHECK +
                                                      OpenCV.CALIB_CB_EXHAUSTIVE + # Run an exhaustive search to improve detection rate.
                                                      OpenCV.CALIB_CB_ACCURACY # Up sample input image to improve sub-pixel accuracy due to aliasing effects.
                                                     )
@@ -72,7 +73,9 @@ function detect_fit(_files, n_corners, with_distortion, aspect)
     @assert !isempty(fi) "No checkers were detected in any of the images, perhaps try a different `n_corners`."
     files = first.(fi)
     imgpointss = last.(fi)
-    objpoints = XYZ.(Tuple.(CartesianIndices(((n_corners[1] - 1):-1:0, (n_corners[2] - 1):-1:0, 0:0))))
+    # objpoints = XYZ.(Tuple.(CartesianIndices(((n_corners[1] - 1):-1:0, (n_corners[2] - 1):-1:0, 0:0))))
+    objpoints = XYZ.(Tuple.(CartesianIndices((0:(n_corners[1] - 1), 0:(n_corners[2] - 1), 0:0))))
+    # objpoints = XYZ.(Tuple.(CartesianIndices(((0:n_corners[1] - 1), (n_corners[2] - 1):-1:0, 0:0))))
     k, Rs, ts, frow, fcol, crow, ccol = fit_model(sz, objpoints, imgpointss, n_corners, with_distortion, aspect)
     return (; files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol)
 end
