@@ -1,5 +1,9 @@
 # CameraCalibrations
 
+[![Build Status](https://github.com/yakir12/CameraCalibrations.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/yakir12/CameraCalibrations.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/yakir12/CameraCalibrations.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/yakir12/CameraCalibrations.jl)
+[![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+
 This is a package for camera calibration in Julia.
 
 ## How to install
@@ -32,3 +36,7 @@ i2 ≈ i1 # true
 - [ ] plot calibrated images
 - [ ] in-memory images
 - [ ] images from video IO
+
+## Citing
+
+See [`CITATION.bib`](CITATION.bib) for the relevant reference(s).
