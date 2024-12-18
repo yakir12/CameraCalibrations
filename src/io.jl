@@ -1,39 +1,18 @@
-function Serde.SerJson.ser_type(::Type{AM}, v::SDiagonal{2, Float64})
-    return v.diag
-end
+const AM = AffineMap{SDiagonal{2, Float64}, SVector{2, Float64}}
+const AMext = AffineMap{RotationVec{Float64}, SVector{3, Float64}}
+const LM3 = LinearMap{SDiagonal{3, Float64}}
 
-function Serde.SerJson.ser_type(::Type{LM3}, v::SDiagonal{3, Float64})
-    return v.diag
-end
+# StructTypes.StructType(::Type{<:SVector}) = StructTypes.CustomStruct()
+# StructTypes.lower(x::SVector) = x.data
+# StructTypes.lowertype(::Type{SVector{N, T}}) where {N, T} = NTuple{N, T}
 
-function Serde.SerJson.ser_type(::Type{AMext}, v::RotationVec{Float64})
-    return [v.sx, v.sy, v.sz]
-end
+# StructTypes.StructType(::Type{<:Diagonal}) = StructTypes.CustomStruct()
+# StructTypes.lower(x::Diagonal) = x.diag
+# StructTypes.lowertype(::Type{Diagonal{T, V}}) where {T, V} = V
 
-function Serde.deser(::Type{AM}, ::Type{SVector{2, Float64}}, v::Vector{Any})
-    return SVector{2, Float64}(v)
-end
-
-function Serde.deser(::Type{AMext}, ::Type{SVector{2, Float64}}, v::Vector{Any})
-    return SVector{2, Float64}(v)
-end
-
-function Serde.deser(::Type{AM}, ::Type{SDiagonal{2, Float64}}, v::Vector{Any})
-    return Diagonal(SVector{2, Float64}(v))
-end
-
-function Serde.deser(::Type{LM3}, ::Type{SDiagonal{3, Float64}}, v)
-    return Diagonal(SVector{3, Float64}(v))
-end
-
-function Serde.deser(::Type{AMext}, ::Type{RotationVec{Float64}}, v::Vector{Any})
-    return RotationVec(v...)
-end
-
-# function Serde.deser(::Type{@NamedTuple{n::Int64, reprojection::Float64, projection::Float64, distance::Float64, inverse::Float64}}, dict::Dict{String, Any})
-#     ks = (:n, :reprojection, :projection, :distance, :inverse)
-#     return (; (k => dict[String(k)] for k in ks)...)
-# end
+StructTypes.StructType(::Type{<:Diagonal}) = StructTypes.CustomStruct()
+StructTypes.lower(x::Diagonal) = x.diag
+StructTypes.lowertype(::Type{Diagonal{T, V}}) where {T, V} = V
 
 struct CalibrationIO
     intrinsic::AM
@@ -43,8 +22,10 @@ struct CalibrationIO
     files::Vector{String}
 end
 
+Random.rand(rng::AbstractRNG, ::Random.SamplerType{CalibrationIO}) = CalibrationIO(AffineMap(Diagonal(rand(rng, SVector{2, Float64})), rand(rng, SVector{2, Float64})), [AffineMap(rand(rng, RotationVec{Float64}), rand(rng, SVector{3, Float64})) for _ in 1:5], LinearMap(Diagonal(rand(rng, SVector{3, Float64}))), rand(rng), [String(rand(rng, 'a':'z', 5)) for _ in 1:5])
+
 function load(file)
-    cio = deser_json(CalibrationIO, read(file, String))
+    cio = JSON3.read(read(file), CalibrationIO)
     distort(rc) = lens_distortion(rc, cio.k)
     real2image = .∘(Ref(cio.intrinsic), distort, Ref(PerspectiveMap()), cio.extrinsics, Ref(cio.scale))
     inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(cio.intrinsic, cio.extrinsics, cio.scale, cio.k)
@@ -52,9 +33,58 @@ function load(file)
     return Calibration(cio.intrinsic, cio.extrinsics, cio.scale, cio.k, cio.files, real2image, image2real)
 end
 
-save(file, cio::CalibrationIO) = open("$file.calib", "w") do io
-    print(io, to_json(cio))
-end
+save(file, cio::CalibrationIO) = JSON3.write(file, cio)
 save(file, c::Calibration) = save(file, CalibrationIO(c.intrinsic, c.extrinsics, c.scale, c.k, c.files))
 
 
+
+
+
+
+
+
+# using LinearAlgebra, Statistics, Random, StaticArrays, Rotations, CoordinateTransformations, JSON3, StructTypes
+#
+#
+# const AM = AffineMap{SDiagonal{2, Float64}, SVector{2, Float64}}
+# const AMext = AffineMap{RotationVec{Float64}, SVector{3, Float64}}
+# const LM3 = LinearMap{SDiagonal{3, Float64}}
+#
+# StructTypes.StructType(::Type{<:Diagonal}) = StructTypes.CustomStruct()
+# StructTypes.lower(x::Diagonal) = x.diag
+# StructTypes.lowertype(::Type{Diagonal{T, V}}) where {T, V} = V
+#
+# struct CalibrationIO
+#     intrinsic::AM
+#     extrinsics::Vector{AMext}
+#     scale::LM3
+#     k::Float64
+#     files::Vector{String}
+# end
+#
+# Random.rand(rng::AbstractRNG, ::Random.SamplerType{CalibrationIO}) = CalibrationIO(AffineMap(Diagonal(rand(rng, SVector{2, Float64})), rand(rng, SVector{2, Float64})), [AffineMap(rand(rng, RotationVec{Float64}), rand(rng, SVector{3, Float64})) for _ in 1:5], LinearMap(Diagonal(rand(rng, SVector{3, Float64}))), rand(rng), [String(rand(rng, 'a':'z', 5)) for _ in 1:5])
+#
+# x = rand(CalibrationIO)
+# v = x.intrinsic
+# txt = JSON3.write(v)
+#
+# txt = "{\"linear\":[0.8369119437634303,0.5233244467702733],\"translation\":[0.4655095816308332,0.6672241801983796]}"
+# y = JSON3.read(txt, typeof(v))
+#
+# using StaticArrays, JSON3, LinearAlgebra
+# x = Diagonal(SVector(1, 2))
+# txt = JSON3.write(x)
+# y = JSON3.read(txt, typeof(x))
+#
+
+
+# module PkgA
+# using StructTypes, LinearAlgebra
+# StructTypes.StructType(::Type{<:Diagonal}) = StructTypes.CustomStruct()
+# StructTypes.lower(x::Diagonal) = x.diag
+# StructTypes.lowertype(::Type{Diagonal{T, V}}) where {T, V} = V
+# end
+#
+# using .PkgA, Aqua
+# Aqua.test_piracies(PkgA)
+#

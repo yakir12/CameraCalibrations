@@ -1,9 +1,11 @@
 module CameraCalibrations
 
-using LinearAlgebra, Statistics
-import FileIO
+using LinearAlgebra, Statistics, Random
+import ImageIO, FileIO
 using OpenCV, ImageBase, StaticArrays, ImageDraw, ImageTransformations
-using Rotations, CoordinateTransformations, Polynomials, Serde
+using Rotations, CoordinateTransformations, Polynomials
+
+using JSON3, StructTypes
 
 include("meta.jl")
 include("io.jl")
@@ -16,11 +18,3 @@ const CRITERIA = OpenCV.TermCriteria(OpenCV.TERM_CRITERIA_EPS + OpenCV.TERM_CRIT
 export fit, Calibration, RowCol, XYZ, rectification
 
 end
-
-
-
-
-
-
-
-

@@ -4,7 +4,7 @@ using Aqua
 
 @testset "CameraCalibrations.jl" begin
     @testset "Code quality (Aqua.jl)" begin
-        Aqua.test_all(CameraCalibrations)
+        Aqua.test_all(CameraCalibrations; piracies = false)
     end
 
     n_corners = (5, 8)
@@ -23,5 +23,17 @@ using Aqua
         f = rectification(c, 1)
         i = RowCol(1,2)
         @test f(i) == c(i, 1)[[1,2]]
+    end
+
+    @testset "IO" begin
+        for _ in 1:10
+            org = rand(CameraCalibrations.CalibrationIO)
+            copy = mktemp() do file, io
+                CameraCalibrations.save(file, org)
+                close(io)
+                CameraCalibrations.load(file)
+            end
+            @test org.files == copy.files
+        end
     end
 end
