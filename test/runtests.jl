@@ -11,10 +11,10 @@ using Aqua
     dir = joinpath(@__DIR__(), "example")
     files = readdir(dir; join=true)
     checker_size = 1
-    c, (_, ϵ...) = fit(files, n_corners, checker_size)
+    c, (n, ϵ...) = fit(files, n_corners, checker_size)
 
     @testset "Accuracy" begin
-        @show ϵ
+        @show n, ϵ
         @test all(<(2), ϵ)
     end
 
