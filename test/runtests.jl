@@ -14,6 +14,7 @@ using Aqua
     c, (_, ϵ...) = fit(files, n_corners, checker_size)
 
     @testset "Accuracy" begin
+        @show ϵ
         @test all(<(2), ϵ)
     end
 
