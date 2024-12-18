@@ -24,16 +24,11 @@ end
 Wraps OpenCV function to fit a camera model to given object and image points.
 """
 function fit_model(sz, objpoints, imgpointss, n_corners,  with_distortion, aspect)
-
-
-    # imgpointss = [pop.(objpoints) for _ in imgpointss]
-
     nfiles = length(imgpointss)
 
     objectPoints = OpenCV.InputArray[Float32.(reshape(stack(objpoints), 3, 1, :)) for _ in 1:nfiles]
     imagePoints = OpenCV.InputArray[Float32.(reshape(stack(imgpoints), 2, 1, :)) for imgpoints in imgpointss]
     imageSize = OpenCV.Size{Int32}(sz...)
-
 
     cammat = collect(I(3))
     cammat[1,:] .= aspect

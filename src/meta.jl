@@ -1,7 +1,5 @@
-const AM = AffineMap{Diagonal{Float64, SVector{2, Float64}}, SVector{2, Float64}}
-
+const AM = AffineMap{SDiagonal{2, Float64}, SVector{2, Float64}}
 const AMext = AffineMap{RotationVec{Float64}, SVector{3, Float64}}
-
 const LM3 = LinearMap{SDiagonal{3, Float64}}
 
 """
@@ -25,8 +23,6 @@ struct Calibration
     real2image::Vector{ComposedFunction}
     image2real::Vector{ComposedFunction}
 end
-
-
 
 function Calibration(intrinsic, extrinsics, scale, k, files)
     distort(rc) = lens_distortion(rc, k)

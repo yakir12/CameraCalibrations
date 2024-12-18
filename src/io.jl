@@ -1,14 +1,6 @@
-const AM = AffineMap{SDiagonal{2, Float64}, SVector{2, Float64}}
-const AMext = AffineMap{RotationVec{Float64}, SVector{3, Float64}}
-const LM3 = LinearMap{SDiagonal{3, Float64}}
-
 # StructTypes.StructType(::Type{<:SVector}) = StructTypes.CustomStruct()
 # StructTypes.lower(x::SVector) = x.data
 # StructTypes.lowertype(::Type{SVector{N, T}}) where {N, T} = NTuple{N, T}
-
-# StructTypes.StructType(::Type{<:Diagonal}) = StructTypes.CustomStruct()
-# StructTypes.lower(x::Diagonal) = x.diag
-# StructTypes.lowertype(::Type{Diagonal{T, V}}) where {T, V} = V
 
 StructTypes.StructType(::Type{<:Diagonal}) = StructTypes.CustomStruct()
 StructTypes.lower(x::Diagonal) = x.diag
