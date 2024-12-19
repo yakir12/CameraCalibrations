@@ -17,7 +17,7 @@ end
 Random.rand(rng::AbstractRNG, ::Random.SamplerType{CalibrationIO}) = CalibrationIO(AffineMap(Diagonal(rand(rng, SVector{2, Float64})), rand(rng, SVector{2, Float64})), [AffineMap(rand(rng, RotationVec{Float64}), rand(rng, SVector{3, Float64})) for _ in 1:5], LinearMap(Diagonal(rand(rng, SVector{3, Float64}))), rand(rng), [String(rand(rng, 'a':'z', 5)) for _ in 1:5])
 
 function load(file)
-    cio = JSON3.read(read(file), CalibrationIO)
+    cio = JSON3.read(read(file, String), CalibrationIO)
     distort(rc) = lens_distortion(rc, cio.k)
     real2image = .∘(Ref(cio.intrinsic), distort, Ref(PerspectiveMap()), cio.extrinsics, Ref(cio.scale))
     inv_scale, inv_extrinsics, inv_perspective_maps, inv_distort, inv_intrinsic = img2obj(cio.intrinsic, cio.extrinsics, cio.scale, cio.k)
@@ -25,7 +25,10 @@ function load(file)
     return Calibration(cio.intrinsic, cio.extrinsics, cio.scale, cio.k, cio.files, real2image, image2real)
 end
 
-save(file, cio::CalibrationIO) = JSON3.write(file, cio)
+save(file, cio::CalibrationIO) = open(file, "w") do io
+    JSON3.write(io, cio)
+end
+
 save(file, c::Calibration) = save(file, CalibrationIO(c.intrinsic, c.extrinsics, c.scale, c.k, c.files))
 
 

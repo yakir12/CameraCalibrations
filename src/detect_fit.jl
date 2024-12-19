@@ -30,7 +30,7 @@ function fit_model(sz, objpoints, imgpointss, n_corners,  with_distortion, aspec
     imagePoints = OpenCV.InputArray[Float32.(reshape(stack(imgpoints), 2, 1, :)) for imgpoints in imgpointss]
     imageSize = OpenCV.Size{Int32}(sz...)
 
-    cammat = collect(I(3))
+    cammat = convert(Matrix{Float64}, I(3))
     cammat[1,:] .= aspect
     cameraMatrix = OpenCV.Mat(Float32.(reshape(cammat, 1, 3, 3)))
     distCoeffs = OpenCV.Mat(Array{Float32}(undef, 1, 1, 5))

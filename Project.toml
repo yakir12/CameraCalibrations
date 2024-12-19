@@ -1,7 +1,7 @@
 name = "CameraCalibrations"
 uuid = "70c3cbac-2c23-4b2d-966c-5a25c0a540fb"
 authors = ["Yakir <12.yakir@gmail.com> and contributors"]
-version = "0.7.2"
+version = "0.7.3"
 
 [deps]
 CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
@@ -22,6 +22,7 @@ StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
 
 [compat]
 Aqua = "0.8"
+ColorTypes = "0.12.0"
 CoordinateTransformations = "0.6"
 FileIO = "1"
 ImageBase = "0.1.7"
@@ -31,6 +32,7 @@ ImageTransformations = "0.9, 0.10"
 JSON3 = "1.14.1"
 LinearAlgebra = "1"
 OpenCV = "4.6.1"
+PaddedViews = "0.5.12"
 Polynomials = "3, 4"
 Random = "1.10"
 Rotations = "1"
@@ -42,7 +44,11 @@ julia = "1.10"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+ColorTypes = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+PaddedViews = "5432bcbf-9aad-5242-b902-cca2824c8663"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Test"]
+test = ["Aqua", "ColorTypes", "FileIO", "PaddedViews", "StaticArrays", "Test"]
