@@ -20,6 +20,28 @@ end
         Aqua.test_all(CameraCalibrations; piracies = false)
     end
 
+    @testset "detect corners" begin
+        for _ in 1:100
+            n_corners = (rand(4:15), rand(4:15))
+            if isequal(isodd.(n_corners)...)
+                n_corners = (n_corners[1] + 1, n_corners[2])
+            end
+            ratio = rand(20:100)
+            xys, img = generate_checkerboard(n_corners, ratio)
+            sz = size(img)
+            xys2 = mktempdir() do path
+                file = joinpath(path, "img.png")
+                FileIO.save(file, Gray.(img))
+                _, xys2 = CameraCalibrations._detect_corners(file, n_corners, sz)
+                return xys2
+            end
+            if xys ≠ xys2
+                @show n_corners, ratio
+            end
+            @test xys == xys2
+        end
+    end
+
     @testset "Real data" begin
         n_corners = (5, 8)
         dir = joinpath(@__DIR__(), "example")
@@ -53,25 +75,4 @@ end
         end
     end
 
-    @testset "detect corners" begin
-        for _ in 1:100
-            n_corners = (rand(4:15), rand(4:15))
-            if isequal(isodd.(n_corners)...)
-                n_corners = (n_corners[1] + 1, n_corners[2])
-            end
-            ratio = rand(20:100)
-            xys, img = generate_checkerboard(n_corners, ratio)
-            sz = size(img)
-            xys2 = mktempdir() do path
-                file = joinpath(path, "img.png")
-                FileIO.save(file, Gray.(img))
-                _, xys2 = CameraCalibrations._detect_corners(file, n_corners, sz)
-                return xys2
-            end
-            if xys ≠ xys2
-                @show n_corners, ratio
-            end
-            @test xys == xys2
-        end
-    end
 end

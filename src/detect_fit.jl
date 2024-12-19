@@ -44,9 +44,6 @@ function fit_model(sz, objpoints, imgpointss, n_corners,  with_distortion, aspec
 
     x, mtx, dist, rvecs, tvecs = OpenCV.calibrateCamera(objectPoints, imagePoints, imageSize, cameraMatrix, distCoeffs, r, t, flags, CRITERIA)
 
-    sleep(.1)
-    yield()
-
     k, _ = dist
 
     Rs = vec.(rvecs)
