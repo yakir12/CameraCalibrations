@@ -1,7 +1,7 @@
 using CameraCalibrations
 using Test
 using Aqua
-using FileIO, StaticArrays, PaddedViews, ColorTypes
+using FileIO, StaticArrays, PaddedViews, ColorTypes, ImageFiltering
 
 function index2bw(ij::CartesianIndex) 
     i, j = Tuple(ij)
@@ -12,7 +12,8 @@ function generate_checkerboard(n_corners, n)
     xys = [n .* SVector{2, Float32}(Tuple(ij)) - SVector(0.5, 0.5) for ij in CartesianIndices(StepRange.(n_corners .+ 1, -1, 2))]
     img = index2bw.(CartesianIndices(n_corners .+ 1))
     imgl = kron(PaddedView(true, img, UnitRange.(0, n_corners .+ 2)), ones(Int, n, n))
-    return xys, imgl
+    imgw = imfilter(imgl, Kernel.gaussian(2))
+    return xys, imgw
 end
 
 @testset "CameraCalibrations.jl" begin
