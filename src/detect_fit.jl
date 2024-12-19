@@ -37,12 +37,15 @@ function fit_model(sz, objpoints, imgpointss, n_corners,  with_distortion, aspec
 
     flags = OpenCV.CALIB_ZERO_TANGENT_DIST + OpenCV.CALIB_FIX_K3 + OpenCV.CALIB_FIX_K2 + (with_distortion ? 0 : OpenCV.CALIB_FIX_K1) + OpenCV.CALIB_FIX_ASPECT_RATIO
 
-    # r = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
-    r = OpenCV.InputArray[ones(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
-    # t = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
-    t = OpenCV.InputArray[ones(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    r = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    # r = OpenCV.InputArray[ones(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    t = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    # t = OpenCV.InputArray[ones(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
 
     x, mtx, dist, rvecs, tvecs = OpenCV.calibrateCamera(objectPoints, imagePoints, imageSize, cameraMatrix, distCoeffs, r, t, flags, CRITERIA)
+
+    sleep(.1)
+    yield()
 
     k, _ = dist
 
