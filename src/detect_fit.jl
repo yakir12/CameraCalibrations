@@ -46,18 +46,12 @@ function fit_model(sz, objpoints, imgpointss, n_corners,  with_distortion, aspec
 
     Rs = vec.(rvecs)
     ts = vec.(tvecs)
-    # Rs = reverse.(vec.(rvecs))
-    # ts = reverse.(vec.(tvecs))
 
     mtx = reshape(mtx, 3, 3)'
     frow = mtx[1,1]
     fcol = mtx[2,2]
     crow = mtx[1,3]
     ccol = mtx[2,3]
-    # fcol = mtx[1,1]
-    # frow = mtx[2,2]
-    # ccol = mtx[1,3]
-    # crow = mtx[2,3]
 
     return (; k, Rs, ts, frow, fcol, crow, ccol)
 end
@@ -68,9 +62,7 @@ function detect_fit(_files, n_corners, with_distortion, aspect)
     @assert !isempty(fi) "No checkers were detected in any of the images, perhaps try a different `n_corners`."
     files = first.(fi)
     imgpointss = last.(fi)
-    # objpoints = XYZ.(Tuple.(CartesianIndices(((n_corners[1] - 1):-1:0, (n_corners[2] - 1):-1:0, 0:0))))
     objpoints = XYZ.(Tuple.(CartesianIndices((0:(n_corners[1] - 1), 0:(n_corners[2] - 1), 0:0))))
-    # objpoints = XYZ.(Tuple.(CartesianIndices(((0:n_corners[1] - 1), (n_corners[2] - 1):-1:0, 0:0))))
     k, Rs, ts, frow, fcol, crow, ccol = fit_model(sz, objpoints, imgpointss, n_corners, with_distortion, aspect)
     return (; files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol)
 end
