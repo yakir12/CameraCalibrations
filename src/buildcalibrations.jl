@@ -35,7 +35,7 @@ end
 Calculate reprojection, projection, distance, and inverse errors for the calibration `c`. `distance` measures the mean error of the distance between all adjacent checkerboard corners from the expected `checker_size`. `inverse` measures the mean error of applying the calibration's transformation and its inverse `inverse_samples` times.
 """
 function calculate_errors(c, imgpointss, objpoints, checker_size, sz, files, n_corners, inverse_samples=100)
-    @show c.intrinsic, c.extrinsics, c.scale, c.k, c.files
+    @show c.extrinsics
     reprojection = 0.0
     projection = 0.0
     distance = 0.0
