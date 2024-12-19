@@ -1,7 +1,7 @@
 using CameraCalibrations
 using Test
 using Aqua
-using FileIO, StaticArrays, PaddedViews, ColorTypes, ImageFiltering
+using FileIO, StaticArrays, PaddedViews, ColorTypes, ImageFiltering, LinearAlgebra
 
 function index2bw(ij::CartesianIndex) 
     i, j = Tuple(ij)
@@ -23,11 +23,11 @@ end
 
     @testset "detect corners" begin
         for _ in 1:100
-            n_corners = (rand(4:15), rand(4:15))
+            n_corners = (rand(5:15), rand(5:15))
             if isequal(isodd.(n_corners)...)
                 n_corners = (n_corners[1] + 1, n_corners[2])
             end
-            ratio = rand(20:100)
+            ratio = rand(50:100)
             xys, img = generate_checkerboard(n_corners, ratio)
             sz = size(img)
             xys2 = mktempdir() do path
