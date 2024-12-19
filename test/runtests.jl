@@ -68,6 +68,9 @@ end
                 _, xys2 = CameraCalibrations._detect_corners(file, n_corners, sz)
                 return xys2
             end
+            if xys ≠ xys2
+                @show n_corners, ratio
+            end
             @test xys == xys2
         end
     end
