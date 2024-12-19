@@ -40,8 +40,8 @@ function calculate_errors(c, imgpointss, objpoints, checker_size, sz, files, n_c
     distance = 0.0
     inverse = 0.0
     for (i, imgpoints) in pairs(imgpointss)
+        @show c, i, objpoints, imgpoints
         reprojection += _reprojection(c, i, objpoints, imgpoints)
-        @show reprojection
 
         projected = c.(imgpoints, i)
         projection += sum(LinearAlgebra.norm_sqr, projected .- objpoints)
