@@ -14,6 +14,7 @@ function _detect_corners(file, n_corners, sz)
                                                      OpenCV.CALIB_CB_ACCURACY # Up sample input image to improve sub-pixel accuracy due to aliasing effects.
                                                     )
     !ret && return missing
+    # corners = reshape(RowCol.(eachslice(cv_corners, dims = 3)), n_corners)
     ref_corners = OpenCV.cornerSubPix(gry, cv_corners, OpenCV.Size{Int32}(11,11), OpenCV.Size{Int32}(-1,-1), CRITERIA)
     corners = reshape(RowCol.(eachslice(ref_corners, dims = 3)), n_corners)
     return (file, corners)
