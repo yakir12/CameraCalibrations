@@ -67,7 +67,7 @@ end
         c, (n, ϵ...) = fit(files, n_corners, checker_size)
 
         @testset "Accuracy" begin
-            # @show n, ϵ
+            @show n, ϵ
             @test all(<(1), ϵ)
         end
 
