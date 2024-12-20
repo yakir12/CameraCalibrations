@@ -52,7 +52,6 @@ function attempt_fit(files, n_corners, checker_size)
     end
 end
 
-
 @testset "CameraCalibrations.jl" begin
     @testset "Code quality (Aqua.jl)" begin
         Aqua.test_all(CameraCalibrations; piracies = false)
@@ -115,5 +114,4 @@ end
             @test org.files == copy.files
         end
     end
-
 end
