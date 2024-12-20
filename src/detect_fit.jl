@@ -34,14 +34,15 @@ function fit_model(sz, objpoints, imgpointss, n_corners,  with_distortion, aspec
     cammat = convert(Matrix{Float32}, I(3))
     cammat[1,:] .= aspect
     cameraMatrix = OpenCV.Mat(Float32.(reshape(cammat, 1, 3, 3)))
-    distCoeffs = OpenCV.Mat(Array{Float32}(undef, 1, 1, 5))
+    # distCoeffs = OpenCV.Mat(Array{Float32}(undef, 1, 1, 5))
+    distCoeffs = OpenCV.Mat(zeros(Float32, 1, 1, 5))
 
     flags = OpenCV.CALIB_ZERO_TANGENT_DIST + OpenCV.CALIB_FIX_K3 + OpenCV.CALIB_FIX_K2 + (with_distortion ? 0 : OpenCV.CALIB_FIX_K1) + OpenCV.CALIB_FIX_ASPECT_RATIO
 
-    r = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
-    # r = OpenCV.InputArray[ones(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
-    t = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
-    # t = OpenCV.InputArray[ones(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    # r = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    r = OpenCV.InputArray[zeros(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    # t = OpenCV.InputArray[Array{Float32}(undef, 3, 1, prod(n_corners)) for _ in 1:nfiles]
+    t = OpenCV.InputArray[zeros(Float32, 3, 1, prod(n_corners)) for _ in 1:nfiles]
 
     x, mtx, dist, rvecs, tvecs = OpenCV.calibrateCamera(objectPoints, imagePoints, imageSize, cameraMatrix, distCoeffs, r, t, flags, CRITERIA)
 
@@ -65,7 +66,6 @@ function detect_fit(_files, n_corners, with_distortion, aspect)
     @assert !isempty(fi) "No checkers were detected in any of the images, perhaps try a different `n_corners`."
     files = first.(fi)
     imgpointss = last.(fi)
-    @show imgpointss
     objpoints = XYZ.(Tuple.(CartesianIndices((0:(n_corners[1] - 1), 0:(n_corners[2] - 1), 0:0))))
     k, Rs, ts, frow, fcol, crow, ccol = fit_model(sz, objpoints, imgpointss, n_corners, with_distortion, aspect)
     return (; files, objpoints, imgpointss, sz, k, Rs, ts, frow, fcol, crow, ccol)
