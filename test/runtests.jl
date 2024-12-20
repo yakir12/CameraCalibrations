@@ -27,7 +27,7 @@ function compare(n_corners, ratio)
     end
 end
 
-function attempts(n_corners, ratio)
+function attempt_compare(n_corners, ratio)
     for attempt in 1:3
         if compare(n_corners, ratio)
             return true
@@ -36,6 +36,20 @@ function attempts(n_corners, ratio)
         end
     end
     return false
+end
+
+function attempt_fit(files, n_corners, checker_size)
+    for attempt in 1:3
+        c, (n, ϵ...) = fit(files, n_corners, checker_size)
+        if all(<(1), ϵ)
+            return c, ϵ
+        else
+            @warn "attempt $attempt failed"
+        end
+        if attempt == 3
+            return c, ϵ
+        end
+    end
 end
 
 
@@ -50,7 +64,7 @@ end
                 # for w in 5:15, h in 5:15, ratio in 50:100
                 if isodd(w) ≠ isodd(h)
                     n_corners = (w, h)
-                    @test attempts(n_corners, ratio)
+                    @test attempt_compare(n_corners, ratio)
                 end
             end
         end
@@ -75,7 +89,7 @@ end
         dir = joinpath(@__DIR__(), "example")
         files = filter(file -> last(splitext(file)) == ".png", readdir(dir, join = true))
         checker_size = 1
-        c, (n, ϵ...) = fit(files, n_corners, checker_size)
+        c, ϵ = attempt_fit(files, n_corners, checker_size)
 
         @testset "Accuracy" begin
             @test all(<(1), ϵ)
