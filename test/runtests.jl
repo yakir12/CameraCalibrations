@@ -27,32 +27,6 @@ function compare(n_corners, ratio)
     end
 end
 
-function attempt_compare(n_corners, ratio)
-    for attempt in 1:3
-        if compare(n_corners, ratio)
-            return true
-        else
-            @warn "attempt $attempt failed"
-        end
-    end
-    return false
-end
-
-function attempt_fit(files, n_corners, checker_size)
-    for attempt in 1:3
-        c, (n, ϵ...) = fit(files, n_corners, checker_size)
-        if all(<(1), ϵ)
-            return c, ϵ
-        else
-            @warn "attempt $attempt failed"
-        end
-        if attempt == 3
-            return c, ϵ
-        end
-    end
-end
-
-
 @testset "CameraCalibrations.jl" begin
     @testset "Code quality (Aqua.jl)" begin
         Aqua.test_all(CameraCalibrations; piracies = false)
@@ -60,12 +34,19 @@ end
 
     @testset "Detect corners" begin
         @testset "In artificial images" begin
-            for w in 13:15, h in 13:15, ratio in 95:100
-                # for w in 5:15, h in 5:15, ratio in 50:100
+                for w in 13:15, h in 13:15, ratio in 95:100
                 if isodd(w) ≠ isodd(h)
                     n_corners = (w, h)
-                    @test attempt_compare(n_corners, ratio)
+                    @test compare(n_corners, ratio)
                 end
+            end
+        end
+
+        @testset "In artificial images (threaded)" begin
+            xs = [((w, h), r) for w in 13:15 for h in 13:15 for r in 95:100 if isodd(w) ≠ isodd(h)]
+            Threads.@threads for i in 1:length(xs)
+                n_corners, ratio = xs[i]
+                @test compare(n_corners, ratio)
             end
         end
 
@@ -89,7 +70,7 @@ end
         dir = joinpath(@__DIR__(), "example")
         files = filter(file -> last(splitext(file)) == ".png", readdir(dir, join = true))
         checker_size = 1
-        c, ϵ = attempt_fit(files, n_corners, checker_size)
+        c, (n, ϵ...) = fit(files, n_corners, checker_size)
 
         @testset "Accuracy" begin
             @test all(<(1), ϵ)
