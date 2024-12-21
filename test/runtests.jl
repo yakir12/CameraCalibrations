@@ -96,5 +96,4 @@ end
             @test org.files == copy.files
         end
     end
-
 end
